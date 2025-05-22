@@ -24,3 +24,11 @@ To sync our repo's DAGs with a centralized DAG folder, we use a symlink:
 ```
 ln -s /your/repositories/dag/folder*/ /your/centralized/dag/folder/
 ```
+
+### Setting Airflow Variables
+
+This proejct requires a setting a few Airflow variables. Set them using the following Airflow CLI command :
+
+```
+airflow variables set <variable_name> <variable_value>
+```
