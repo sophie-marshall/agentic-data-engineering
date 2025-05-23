@@ -1,0 +1,309 @@
+import pendulum
+import requests
+import boto3
+from datetime import datetime
+from urllib.parse import quote_plus
+
+from airflow.sdk import dag, task, Variable
+
+FEED_URLS = [
+    "https://www.npr.org/rss/rss.php?id=1126",
+    "https://www.npr.org/rss/rss.php?id=1059",
+    "https://www.npr.org/rss/rss.php?id=1132",
+    "https://www.npr.org/rss/rss.php?id=1142",
+    "https://www.npr.org/rss/rss.php?id=1047",
+    "https://www.npr.org/rss/rss.php?id=1125",
+    "https://www.npr.org/rss/rss.php?id=1033",
+    "https://www.npr.org/rss/rss.php?id=1161",
+    "https://www.npr.org/rss/rss.php?id=1034",
+    "https://www.npr.org/rss/rss.php?id=1032",
+    "https://www.npr.org/rss/rss.php?id=1006",
+    "https://www.npr.org/rss/rss.php?id=1030",
+    "https://www.npr.org/rss/rss.php?id=1167",
+    "https://www.npr.org/rss/rss.php?id=1008",
+    "https://www.npr.org/rss/rss.php?id=1145",
+    "https://www.npr.org/rss/rss.php?id=1051",
+    "https://www.npr.org/rss/rss.php?id=1017",
+    "https://www.npr.org/rss/rss.php?id=1013",
+    "https://www.npr.org/rss/rss.php?id=139482413",
+    "https://www.npr.org/rss/rss.php?id=1131",
+    "https://www.npr.org/rss/rss.php?id=1025",
+    "https://www.npr.org/rss/rss.php?id=1124",
+    "https://www.npr.org/rss/rss.php?id=1164",
+    "https://www.npr.org/rss/rss.php?id=1141",
+    "https://www.npr.org/rss/rss.php?id=1134",
+    "https://www.npr.org/rss/rss.php?id=1053",
+    "https://www.npr.org/rss/rss.php?id=820593993",
+    "https://www.npr.org/rss/rss.php?id=820266919",
+    "https://www.npr.org/rss/rss.php?id=1175243560",
+    "https://www.npr.org/rss/rss.php?id=1054",
+    "https://www.npr.org/rss/rss.php?id=1031",
+    "https://www.npr.org/rss/rss.php?id=1128",
+    "https://www.npr.org/rss/rss.php?id=1027",
+    "https://www.npr.org/rss/rss.php?id=1136",
+    "https://www.npr.org/rss/rss.php?id=1002",
+    "https://www.npr.org/rss/rss.php?id=1052",
+    "https://www.npr.org/rss/rss.php?id=1081",
+    "https://www.npr.org/rss/rss.php?id=1150",
+    "https://www.npr.org/rss/rss.php?id=1093",
+    "https://www.npr.org/rss/rss.php?id=1127",
+    "https://www.npr.org/rss/rss.php?id=1070",
+    "https://www.npr.org/rss/rss.php?id=1074",
+    "https://www.npr.org/rss/rss.php?id=1076",
+    "https://www.npr.org/rss/rss.php?id=1020",
+    "https://www.npr.org/rss/rss.php?id=1135",
+    "https://www.npr.org/rss/rss.php?id=1029",
+    "https://www.npr.org/rss/rss.php?id=1009",
+    "https://www.npr.org/rss/rss.php?id=1137",
+    "https://www.npr.org/rss/rss.php?id=4467349",
+    "https://www.npr.org/rss/rss.php?id=1045",
+    "https://www.npr.org/rss/rss.php?id=1003",
+    "https://www.npr.org/rss/rss.php?id=1122",
+    "https://www.npr.org/rss/rss.php?id=1047406725",
+    "https://www.npr.org/rss/rss.php?id=1001",
+    "https://www.npr.org/rss/rss.php?id=1062",
+    "https://www.npr.org/rss/rss.php?id=1028",
+    "https://www.npr.org/rss/rss.php?id=1133",
+    "https://www.npr.org/rss/rss.php?id=1057",
+    "https://www.npr.org/rss/rss.php?id=1046",
+    "https://www.npr.org/rss/rss.php?id=1166",
+    "https://www.npr.org/rss/rss.php?id=1143",
+    "https://www.npr.org/rss/rss.php?id=1014",
+    "https://www.npr.org/rss/rss.php?id=1048",
+    "https://www.npr.org/rss/rss.php?id=139544303",
+    "https://www.npr.org/rss/rss.php?id=1015",
+    "https://www.npr.org/rss/rss.php?id=1023",
+    "https://www.npr.org/rss/rss.php?id=1139",
+    "https://www.npr.org/rss/rss.php?id=1016",
+    "https://www.npr.org/rss/rss.php?id=1024",
+    "https://www.npr.org/rss/rss.php?id=1007",
+    "https://www.npr.org/rss/rss.php?id=1083",
+    "https://www.npr.org/rss/rss.php?id=1026",
+    "https://www.npr.org/rss/rss.php?id=1055",
+    "https://www.npr.org/rss/rss.php?id=139545485",
+    "https://www.npr.org/rss/rss.php?id=1146",
+    "https://www.npr.org/rss/rss.php?id=1088",
+    "https://www.npr.org/rss/rss.php?id=1087",
+    "https://www.npr.org/rss/rss.php?id=1085",
+    "https://www.npr.org/rss/rss.php?id=1086",
+    "https://www.npr.org/rss/rss.php?id=1089",
+    "https://www.npr.org/rss/rss.php?id=1019",
+    "https://www.npr.org/rss/rss.php?id=1138",
+    "https://www.npr.org/rss/rss.php?id=1144",
+    "https://www.npr.org/rss/rss.php?id=1163",
+    "https://www.npr.org/rss/rss.php?id=1175242824",
+    "https://www.npr.org/rss/rss.php?id=1165",
+    "https://www.npr.org/rss/rss.php?id=1004",
+    "https://www.npr.org/rss/rss.php?id=1066",
+    "https://www.npr.org/rss/rss.php?id=1018",
+    "https://www.npr.org/rss/rss.php?id=139998151",
+    "https://www.npr.org/rss/rss.php?id=10003",
+    "https://www.npr.org/rss/rss.php?id=1109",
+    "https://www.npr.org/rss/rss.php?id=92792712",
+    "https://www.npr.org/rss/rss.php?id=135408474",
+    "https://www.npr.org/rss/rss.php?id=139999257",
+    "https://www.npr.org/rss/rss.php?id=735750628",
+    "https://www.npr.org/rss/rss.php?id=10005",
+    "https://www.npr.org/rss/rss.php?id=1040",
+    "https://www.npr.org/rss/rss.php?id=10002",
+    "https://www.npr.org/rss/rss.php?id=139996449",
+    "https://www.npr.org/rss/rss.php?id=853031894",
+    "https://www.npr.org/rss/rss.php?id=1039",
+    "https://www.npr.org/rss/rss.php?id=613820055",
+    "https://www.npr.org/rss/rss.php?id=1105",
+    "https://www.npr.org/rss/rss.php?id=1107",
+    "https://www.npr.org/rss/rss.php?id=1106",
+    "https://www.npr.org/rss/rss.php?id=1151",
+    "https://www.npr.org/rss/rss.php?id=1104",
+    "https://www.npr.org/rss/rss.php?id=1110",
+    "https://www.npr.org/rss/rss.php?id=1108",
+    "https://www.npr.org/rss/rss.php?id=10006",
+    "https://www.npr.org/rss/rss.php?id=139997200",
+    "https://www.npr.org/rss/rss.php?id=139998808",
+    "https://www.npr.org/rss/rss.php?id=740095648",
+    "https://www.npr.org/rss/rss.php?id=10001",
+    "https://www.npr.org/rss/rss.php?id=1103",
+    "https://www.npr.org/rss/rss.php?id=10004",
+    "https://www.npr.org/rss/rss.php?id=65",
+    "https://www.npr.org/rss/rss.php?id=2",
+    "https://www.npr.org/rss/rss.php?id=58",
+    "https://www.npr.org/rss/rss.php?id=17",
+    "https://www.npr.org/rss/rss.php?id=13",
+    "https://www.npr.org/rss/rss.php?id=60",
+    "https://www.npr.org/rss/rss.php?id=64",
+    "https://www.npr.org/rss/rss.php?id=22",
+    "https://www.npr.org/rss/rss.php?id=3",
+    "https://www.npr.org/rss/rss.php?id=11",
+    "https://www.npr.org/rss/rss.php?id=38",
+    "https://www.npr.org/rss/rss.php?id=4",
+    "https://www.npr.org/rss/rss.php?id=61",
+    "https://www.npr.org/rss/rss.php?id=62",
+    "https://www.npr.org/rss/rss.php?id=16",
+    "https://www.npr.org/rss/rss.php?id=5",
+    "https://www.npr.org/rss/rss.php?id=57",
+    "https://www.npr.org/rss/rss.php?id=46",
+    "https://www.npr.org/rss/rss.php?id=47",
+    "https://www.npr.org/rss/rss.php?id=15",
+    "https://www.npr.org/rss/rss.php?id=14",
+    "https://www.npr.org/rss/rss.php?id=35",
+    "https://www.npr.org/rss/rss.php?id=7",
+    "https://www.npr.org/rss/rss.php?id=10",
+    "https://www.npr.org/rss/rss.php?id=1002643619",
+    "https://www.npr.org/rss/rss.php?id=114424647",
+    "https://www.npr.org/rss/rss.php?id=104014555",
+    "https://www.npr.org/rss/rss.php?id=15709577",
+    "https://www.npr.org/rss/rss.php?id=179840764",
+    "https://www.npr.org/rss/rss.php?id=102920358",
+    "https://www.npr.org/rss/rss.php?id=128334429",
+    "https://www.npr.org/rss/rss.php?id=96651030",
+    "https://www.npr.org/rss/rss.php?id=1028164989",
+    "https://www.npr.org/rss/rss.php?id=166026576",
+    "https://www.npr.org/rss/rss.php?id=243060737",
+    "https://www.npr.org/rss/rss.php?id=935383612",
+    "https://www.npr.org/rss/rss.php?id=7282089",
+    "https://www.npr.org/rss/rss.php?id=953563528",
+    "https://www.npr.org/rss/rss.php?id=88230540",
+    "https://www.npr.org/rss/rss.php?id=173754155",
+    "https://www.npr.org/rss/rss.php?id=816541428",
+    "https://www.npr.org/rss/rss.php?id=91701279",
+    "https://www.npr.org/rss/rss.php?id=914632053",
+    "https://www.npr.org/rss/rss.php?id=129702125",
+    "https://www.npr.org/rss/rss.php?id=603375090",
+    "https://www.npr.org/rss/rss.php?id=221742223",
+    "https://www.npr.org/rss/rss.php?id=124451157",
+    "https://www.npr.org/rss/rss.php?id=327351768",
+    "https://www.npr.org/rss/rss.php?id=166001143",
+    "https://www.npr.org/rss/rss.php?id=955521248",
+    "https://www.npr.org/rss/rss.php?id=906364279",
+    "https://www.npr.org/rss/rss.php?id=17371741",
+    "https://www.npr.org/rss/rss.php?id=956924083",
+    "https://www.npr.org/rss/rss.php?id=91000411",
+    "https://www.npr.org/rss/rss.php?id=129828651",
+    "https://www.npr.org/rss/rss.php?id=90399050",
+    "https://www.npr.org/rss/rss.php?id=5500502",
+    "https://www.npr.org/rss/rss.php?id=1114580140",
+    "https://www.npr.org/rss/rss.php?id=913744623",
+    "https://www.npr.org/rss/rss.php?id=1010220012",
+    "https://www.npr.org/rss/rss.php?id=989574969",
+    "https://www.npr.org/rss/rss.php?id=1013457191",
+    "https://www.npr.org/rss/rss.php?id=981621879",
+    "https://www.npr.org/rss/rss.php?id=919392585",
+    "https://www.npr.org/rss/rss.php?id=968834359",
+    "https://www.npr.org/rss/rss.php?id=921615132",
+    "https://www.npr.org/rss/rss.php?id=193157993",
+    "https://www.npr.org/rss/rss.php?id=15710080",
+    "https://www.npr.org/rss/rss.php?id=8992549",
+    "https://www.npr.org/rss/rss.php?id=9799333",
+    "https://www.npr.org/rss/rss.php?id=1066022891",
+    "https://www.npr.org/rss/rss.php?id=311911180",
+    "https://www.npr.org/rss/rss.php?id=129554188",
+    "https://www.npr.org/rss/rss.php?id=114410181",
+    "https://www.npr.org/rss/rss.php?id=371730990",
+    "https://www.npr.org/rss/rss.php?id=347730015",
+    "https://www.npr.org/rss/rss.php?id=17370252",
+    "https://www.npr.org/rss/rss.php?id=181572415",
+    "https://www.npr.org/rss/rss.php?id=157033248",
+    "https://www.npr.org/rss/rss.php?id=93559255",
+    "https://www.npr.org/rss/rss.php?id=97248522",
+    "https://www.npr.org/rss/rss.php?id=959046599",
+    "https://www.npr.org/rss/rss.php?id=129527899",
+    "https://www.npr.org/rss/rss.php?id=92448824",
+    "https://www.npr.org/rss/rss.php?id=103537970",
+    "https://www.npr.org/rss/rss.php?id=127596581",
+    "https://www.npr.org/rss/rss.php?id=88133562",
+    "https://www.npr.org/rss/rss.php?id=1239432910",
+    "https://www.npr.org/rss/rss.php?id=967013753",
+    "https://www.npr.org/rss/rss.php?id=916971853",
+    "https://www.npr.org/rss/rss.php?id=11211861",
+    "https://www.npr.org/rss/rss.php?id=6831923",
+    "https://www.npr.org/rss/rss.php?id=136825643",
+    "https://www.npr.org/rss/rss.php?id=1064145788",
+    "https://www.npr.org/rss/rss.php?id=9177927",
+    "https://www.npr.org/rss/rss.php?id=262161990",
+    "https://www.npr.org/rss/rss.php?id=97635953",
+    "https://www.npr.org/rss/rss.php?id=186436538",
+    "https://www.npr.org/rss/rss.php?id=128494978",
+    "https://www.npr.org/rss/rss.php?id=139941248",
+    "https://www.npr.org/rss/rss.php?id=137106445",
+    "https://www.npr.org/rss/rss.php?id=156907158",
+    "https://www.npr.org/rss/rss.php?id=103943429",
+    "https://www.npr.org/rss/rss.php?id=10002163",
+    "https://www.npr.org/rss/rss.php?id=964447177",
+    "https://www.npr.org/rss/rss.php?id=931862775",
+    "https://www.npr.org/rss/rss.php?id=869732878",
+    "https://www.npr.org/rss/rss.php?id=92181432",
+    "https://www.npr.org/rss/rss.php?id=112176971",
+    "https://www.npr.org/rss/rss.php?id=898709145",
+    "https://www.npr.org/rss/rss.php?id=93536022",
+    "https://www.npr.org/rss/rss.php?id=216835831",
+    "https://www.pbs.org/newshour/feeds/rss/headlines",
+    "https://www.pbs.org/newshour/feeds/rss/politics",
+    "https://www.pbs.org/newshour/feeds/rss/brooks-and-capehart",
+]
+
+
+def get_s3_client_with_role(role_arn: str, region: str = "us-east-1"):
+    sts = boto3.client("sts")
+    creds = sts.assume_role(RoleArn=role_arn, RoleSessionName="airflow-dag-session")[
+        "Credentials"
+    ]
+
+    return boto3.client(
+        "s3",
+        aws_access_key_id=creds["AccessKeyId"],
+        aws_secret_access_key=creds["SecretAccessKey"],
+        aws_session_token=creds["SessionToken"],
+        region_name=region,
+    )
+
+
+@dag(
+    schedule="0 17 * * *",
+    start_date=pendulum.datetime(2025, 5, 22, tz="America/New_York"),
+    catchup=False,
+    tags=["agentic-de"],
+)
+def extract_raw_data():
+    @task()
+    def request_feed(rss_feed_url: str) -> dict[str, str] | None:
+        res = requests.get(rss_feed_url, timeout=10)
+        if res.status_code != 200:
+            print(
+                f"Error retrieving XML document for {rss_feed_url}: {res.status_code}"
+            )
+            return None
+
+        return {
+            "rss_url": rss_feed_url,
+            "xml_doc": res.text,
+        }
+
+    @task()
+    def upload_to_bronze(res_dict: dict[str, str] | None) -> None:
+        if res_dict is None:
+            print("No data to upload")
+            return
+
+        today = datetime.today().strftime("%m%d%Y")
+        role_arn = Variable.get("DIGI_INNO_ROLE_ARN")
+        if not role_arn:
+            print("Missing role ARN")
+            return
+
+        s3 = get_s3_client_with_role(role_arn)
+        try:
+            s3.put_object(
+                Bucket="agentic-de",
+                Key=f"bronze/{today}/{quote_plus(res_dict['rss_url'])}_{today}.xml",
+                Body=res_dict["xml_doc"],
+                ContentType="application/xml",
+            )
+            print("Success!")
+        except Exception as e:
+            print(f"Error uploading to S3: {str(e)}")
+
+    xml_docs = request_feed.expand(rss_feed_url=FEED_URLS)
+    upload_to_bronze.expand(res_dict=xml_docs)
+
+
+extract_raw_data()
