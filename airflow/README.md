@@ -1,4 +1,4 @@
-# Here are some instructions for getting Airlfow and nd runnig
+# Here are some instructions for getting Airlfow and runnig
 
 ## Getting Started
 
