@@ -1,6 +1,8 @@
-# Here are some instructions for getting Airlfow and nd runnig
+# Getting Started with Airflow
 
-## Getting Started
+## Initial Configuration
+
+Some quick config adjustments made for QOL or to align with best practices
 
 ### Postgres Backend
 
@@ -23,6 +25,19 @@ To sync our repo's DAGs with a centralized DAG folder, we use a symlink:
 
 ```
 ln -s /your/repositories/dag/folder*/ /your/centralized/dag/folder/
+```
+
+### Moving `secret_key` Option
+
+If requests to the TaskFlow API are failing with a `405`, check your `airflow.cfg` file. As of Airflow 3.0, the `secret_key` option was moved from the webserver section to the api section.
+
+## Starting Airflow Services
+
+To start the Airflow server use the following code:
+
+```
+# run this to start the server ()
+airflow api-server
 ```
 
 ### Setting Airflow Variables
