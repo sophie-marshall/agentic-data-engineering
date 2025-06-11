@@ -42,7 +42,7 @@ airflow api-server
 
 ### Setting Airflow Variables
 
-This proejct requires a setting a few Airflow variables. Set them using the following Airflow CLI command :
+This project requires a setting a few Airflow variables. Set them using the following Airflow CLI command :
 
 ```
 airflow variables set <variable_name> <variable_value>
