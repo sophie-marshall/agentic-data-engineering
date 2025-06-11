@@ -1,5 +1,7 @@
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
+from datetime import datetime
+from urllib.parse import quote_plus
 import os
 
 
@@ -76,6 +78,28 @@ class S3(AWSResource):
             return client
         except (BotoCoreError, ClientError) as e:
             raise RuntimeError(f"Failed to create S3 client: {e}")
+
+    @classmethod
+    def upload_raw_rss_data(
+        cls, res_dict: dict[str, str] | None, role_arn: str = None, **kwargs
+    ):
+        if res_dict is None:
+            raise ValueError("No data to upload")
+
+        today = datetime.today().strftime("%m%d%Y")
+
+        client = cls._get_or_create_client(role_arn, **kwargs)
+
+        try:
+            client.put_object(
+                Bucket=os.getenv("S3_BUCKET", "agentic-de"),
+                Key=f"bronze/{today}/{quote_plus(res_dict['rss_url'])}_{today}.xml",
+                Body=res_dict["xml_doc"],
+                ContentType="application/xml",
+            )
+            print("Success!")
+        except (BotoCoreError, ClientError) as e:
+            raise RuntimeError(f"Failed to upload to S3: {e}")
 
     @classmethod
     def get_keys_by_date(cls, date: str, role_arn: str, **kwargs):
