@@ -117,7 +117,9 @@ class S3(AWSResource):
         return keys
 
     @classmethod
-    def get_file_metadata(cls, key: str, chars_to_sample: int, role_arn: str, **kwargs):
+    def get_file_metadata(
+        cls, key: str, chars_to_sample: int, role_arn: str, **kwargs
+    ) -> str:
         client = cls._get_or_create_client(role_arn, **kwargs)
         obj = client.get_object(Bucket=os.getenv("S3_BUCKET"), Key=key)
         content = obj["Body"].read(chars_to_sample).decode("utf-8")
