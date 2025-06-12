@@ -20,7 +20,7 @@ def generate_npr_feed_urls():
             + "Chrome/120.0.0.0 Safari/537.36"
         },
     )
-    soup = BeautifulSoup(res.text, "html")
+    soup = BeautifulSoup(res.text, "html.parser")
     topics, programs, blogs = soup.find_all("table")
 
     # iterate over available tables to get IDs and construct RSS feed URLs

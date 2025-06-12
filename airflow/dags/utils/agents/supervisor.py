@@ -7,7 +7,8 @@ from airflow.dags.utils.airflow_client import AirflowClient
 
 
 class SupervisorAgent:
-    # class cars
+
+    # class vars
     _agent = None
     _llm = None
 
@@ -61,7 +62,7 @@ class SupervisorAgent:
             - transform_pbs_data
             - transform_npr_data
 
-            Then call TriggerAirflowDAG with the correct DAG ID.
+            Then call TriggerTrasnformationDAG with the correct DAG ID.
         """
 
         print(cls._agent.run(prompt))
